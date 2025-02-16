@@ -115,4 +115,3 @@ class MedicalService:
     def _validate_age(self, age: int) -> bool:
         """Helper method to validate age"""
         return isinstance(age, int) and 0 <= age <= 120
-

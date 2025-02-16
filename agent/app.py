@@ -1,11 +1,27 @@
-from typing import List, Dict, Any, Tuple
+from typing import List, Dict, Any, Tuple, Optional
 import anthropic
 import yaml
 import os 
+import json
 from dotenv import load_dotenv
+from dataclasses import dataclass
 
 from agent.services import MedicalService
 from agent.tools import Tool
+
+
+@dataclass
+class UserInfo:
+    age: int
+    gender: str
+    described_symptoms: List[str]
+
+
+@dataclass
+class DiagnosisStep:
+    symptom_ids: List[int]
+    specializations: List[Dict]
+    final_recommendation: Optional[str] = None
 
 
 class MedicalAssistantLLM:
@@ -83,7 +99,8 @@ class MedicalAssistantLLM:
             return {
                 "error": f"Tool execution failed: {str(e)}"
             }, True
-
+    
+    
     async def _handle_tool_calls(
         self, 
         tool_calls: List[Dict]
@@ -119,47 +136,6 @@ class MedicalAssistantLLM:
             
         return tool_results
     
-    # async def _handle_tool_response(self, response: Any, messages: List[Dict]) -> str:
-    #     """
-    #     Handle tool use response from Claude and get final response.
-    #     """
-    #     try:
-    #         if response.stop_reason == 'tool_use':
-    #             for content in response.content:
-    #                 if content.type == 'tool_use':
-    #                     # Execute the requested tool
-    #                     tool_result, is_error = await self._execute_tool(
-    #                         content.name,
-    #                         content.input
-    #                     )
-
-    #                     messages.extend([
-    #                         # {
-    #                         #     "role": "assistant",
-    #                         #     "content": response.content[0].text
-    #                         # },
-    #                         {
-    #                             "role": "assistant",
-    #                             "content": str(tool_result)
-    #                         }
-    #                     ])
-                        
-    #                     # Get final response from Claude with tool results
-    #                     final_response = self.client.messages.create(
-    #                         model=self.MODEL,
-    #                         max_tokens=1024,
-    #                         system=self.system_prompt,
-    #                         messages=messages,
-    #                         tools=Tool.get_all_tools(),
-    #                     )
-                        
-    #                     return final_response.content[0].text
-                        
-    #         return response.content[0].text
-            
-    #     except Exception as e:
-    #         print(f"Error handling tool response: {str(e)}")
-    #         raise
     async def _chain_tool_calls(self, initial_response: Any, messages: List[Dict]) -> str:
         """
         Chain multiple tool calls and their responses together.
@@ -187,10 +163,10 @@ class MedicalAssistantLLM:
                         tool_result, is_error = await self._execute_tool(
                             content.name,
                             content.input
-                        )      
+                        )
 
-                        print(tool_result) 
-                        # Add to conversation
+                        print(len(tool_result))
+
                         messages.extend([
                             {
                                 "role": "assistant",
@@ -198,7 +174,7 @@ class MedicalAssistantLLM:
                             },
                             {
                                 "role": "assistant",
-                                "content": tool_result
+                                "content": str(len(tool_result))
                             }
                         ])
                         
@@ -236,45 +212,97 @@ class MedicalAssistantLLM:
                     "content": user_input
                 }
             ]
+
+            # Step 1: Call get_symptoms to retrieve the list of standardized symptoms
+            symptoms_result, is_error = await self._execute_tool("get_symptoms", {})
+            if is_error:
+                return f"Error retrieving symptoms: {symptoms_result.get('error')}"
+            string_representation = json.dumps(symptoms_result, indent=2)
             # Get response from Claude
-            initial_response = self.client.messages.create(
+            matching_response = self.client.messages.create(
                 model=self.MODEL,
                 max_tokens=1024,
-                system=self.system_prompt,  # Pass the prompt string directly
+                # system=self.system_prompt,  # Pass the prompt string directly
+                system=f"Match the user's symptoms with the available symptoms list {symptoms_result} and prepare symptom_ids for specialization lookup.",
                 messages=messages,
                 tools=Tool.get_all_tools(),
                 tool_choice={"type": "auto"},
             )
-            if initial_response.stop_reason == 'tool_use':
 
-                final_response = await self._chain_tool_calls(initial_response, messages)
-            else: 
-                final_response = initial_response.content[0].text
+            # Extract matched symptom IDs from Claude's analysis
+            # matched_symptom_ids = self._extract_symptom_ids(matching_response)
+            # if not matched_symptom_ids:
+            #     return "Error: Could not match symptoms with available list."
+
+            # # Step 3: Call get_specializations with matched symptom IDs
+            # spec_result, is_error = await self._execute_tool(
+            #     "get_specializations",
+            #     {
+            #         "symptom_ids": matched_symptom_ids,
+            #         "age": 30,  # Default age if not provided
+            #         "gender": "male"  # Default gender if not provided
+            #     }
+            # )
+            # if is_error:
+            #     return f"Error retrieving specializations: {spec_result.get('error')}"
+
+            # # Add specialization results to context
+            # messages.extend([
+            #     {"role": "assistant", "content": matching_response.content[0].text},
+            #     {"role": "tool", "content": str(spec_result)}
+            # ])
+
+            # Get final recommendation
+            # final_response = self.client.messages.create(
+            #     model=self.MODEL,
+            #     max_tokens=1024,
+            #     system="Provide a final recommendation based on the matched symptoms and specialization results.",
+            #     messages=messages,
+            # )
+
+            # final_answer = final_response.content[0].text
+
+            # # Update conversation history
+            # self.conversation_history.extend([
+            #     {"role": "user", "content": user_input},
+            #     {"role": "assistant", "content": final_answer}
+            # ])
+
+            return matching_response
+            # return final_answer
+
+            
+            # If specialization recommendation is requested
+            # if response.stop_reason == 'tool_use':
+            #     tool_call = next(
+            #         (c for c in response.content if c.type == 'tool_use'),
+            #         None
+            #     )
+            #     if tool_call and tool_call.name == 'get_specializations':
+            #         # Execute get_specializations
+            #         spec_result, is_error = await self._execute_tool(
+            #             "get_specializations",
+            #             tool_call.input
+            #         )
+                    
+                    # Add specialization result to conversation
+                    # messages.extend([
+                    #     {"role": "assistant", "content": response.content[0].text},
+                    #     {"role": "tool", "content": str(spec_result)}
+                    # ])
 
             # Update conversation history
-            self.conversation_history.extend([
-                {"role": "user", "content": user_input},
-                {"role": "assistant", "content": final_response}
-            ])
+            # self.conversation_history.extend([
+            #     {"role": "user", "content": user_input},
+            #     {"role": "assistant", "content": response}
+            # ])
 
-            return final_response.content[0].text
+            # return response
 
         except Exception as e:
             print(f"Detailed error: {str(e)}")  
             return f"Error processing message: {str(e)}"
     
-    def clear_history(self):
-        """Clear the conversation history"""
-        self.conversation_history = []
-    
-    def get_conversation_history(self) -> List[Dict]:
-        """Return the current conversation history"""
-        return self.conversation_history
-
-    def reload_prompt(self, prompt_path: str = "prompt.yaml"):
-        """Reload the system prompt from the YAML file"""
-        self.system_prompt = self._load_system_prompt(prompt_path)
-
 
 async def main():
     load_dotenv()
@@ -291,12 +319,12 @@ async def main():
     try:
         print("\nQuerying about symptoms...")
         response = await assistant.process_message(
-            "I have fever, and stomachache."
+            "I have fever, and stomachache. I am a female and 26."
         )
         print(f"{response}")
         
-        for message in assistant.get_conversation_history():
-            print(f"{message['role']}: {message['content']}\n")
+        # for message in assistant.get_conversation_history():
+        #     print(f"{message['role']}: {message['content']}\n")
           
     except Exception as e:
         print(f"Error during execution: {str(e)}")

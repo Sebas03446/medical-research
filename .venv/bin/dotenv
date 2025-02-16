@@ -1,4 +1,4 @@
-#!/home/jean/GitHub/Hackaton/medical-research/.venv/bin/python3
+#!/Users/zeinab/Downloads/medical-research/.venv/bin/python3.13
 # -*- coding: utf-8 -*-
 import re
 import sys
