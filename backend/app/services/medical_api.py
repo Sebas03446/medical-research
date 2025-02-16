@@ -76,7 +76,13 @@ def get_specialisations(
     Raises:
         HTTPError: If the API call fails with a non-200 status code.
     """
-    token = get_access_token(settings.API_KEY_MEDICAL_API, settings.SECRET_KEY_MEDICAL_API)["Token"]
+    api_key = os.environ.get("API_KEY_MEDICAL_API")
+    secret_key = os.environ.get("SECRET_KEY_MEDICAL_API")
+    
+    if not api_key or not secret_key:
+        raise ValueError("API_KEY_MEDICAL_API and SECRET_KEY_MEDICAL_API must be set as environment variables.")
+    
+    token = get_access_token(api_key, secret_key)["Token"]
     url = "https://healthservice.priaid.ch/diagnosis/specialisations"
     
     # Build query parameters. The 'symptoms' parameter must be a JSON encoded list.

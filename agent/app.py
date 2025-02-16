@@ -5,8 +5,11 @@ import os
 from pathlib import Path
 from datetime import datetime
 from dotenv import load_dotenv
-from backend.app.services.medical_api import get_symptoms
+from backend.app.services.medical_api import get_symptoms, get_specialisations
+from dotenv import load_dotenv
+import os
 
+load_dotenv() 
 
 class MedicalAssistantLLM:
     def __init__(self, anthropic_api_key: str, prompt_path: str = "prompt.yaml"):
@@ -111,4 +114,5 @@ def main():
  
 if __name__ == "__main__":
     #main()
-    print(get_symptoms())
+    #print(get_symptoms())
+    print(get_specialisations([101],"male",1990))
