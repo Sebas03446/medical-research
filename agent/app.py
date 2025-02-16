@@ -3,10 +3,14 @@ import anthropic
 import yaml
 import os 
 from dotenv import load_dotenv
+from backend.app.services.medical_api import get_symptoms, get_specialisations
+from dotenv import load_dotenv
+import os
 
 from services import MedicalService
 from tools import Tool
 
+load_dotenv() 
 
 class MedicalAssistantLLM:
     def __init__(self, anthropic_api_key: str, prompt_path: str = "prompt.yaml"):
@@ -163,4 +167,6 @@ def main():
 
  
 if __name__ == "__main__":
-    main()
+    #main()
+    #print(get_symptoms())
+    print(get_specialisations([101],"male",1990))
