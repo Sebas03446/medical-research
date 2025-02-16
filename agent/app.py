@@ -1,13 +1,14 @@
-from typing import List, Dict, Optional
+from typing import List, Dict, Any, Tuple
 import anthropic
 import yaml
 import os 
-from pathlib import Path
-from datetime import datetime
 from dotenv import load_dotenv
 from backend.app.services.medical_api import get_symptoms, get_specialisations
 from dotenv import load_dotenv
 import os
+
+from services import MedicalService
+from tools import Tool
 
 load_dotenv() 
 
@@ -17,6 +18,8 @@ class MedicalAssistantLLM:
         Initialize the Medical Assistant LLM component
         """
         self.client = anthropic.Client(api_key=anthropic_api_key)
+        self.service = MedicalService()
+        self.MODEL = "claude-3-5-sonnet-20241022"
         self.conversation_history = []
         self.system_prompt = self._load_system_prompt(prompt_path)
 
@@ -33,15 +36,86 @@ class MedicalAssistantLLM:
                 return prompts['system_prompt']  # Return just the content string
         except Exception as e:
             raise Exception(f"Error loading prompt file: {str(e)}")
+    
+    async def _execute_tool(
+        self, 
+        tool_name: str, 
+        tool_args: Dict[str, Any]
+    ) -> Tuple[Dict, bool]:
+        """
+        Execute a tool and return its result along with error status.
+        
+        Args:
+            tool_name: Name of the tool to execute
+            tool_args: Arguments to pass to the tool
+            
+        Returns:
+            Tuple[Dict, bool]: (result, is_error)
+                - result: Tool execution result or error message
+                - is_error: True if an error occurred, False otherwise
+        """
+        try:
+            if tool_name == "get_symptoms":
+                result = await self.service.get_symptoms()
+                return result, False
+                
+            elif tool_name == "get_specializations":
+                result = await self.service.get_specializations(**tool_args)
+                return result, False
+                
+            else:
+                return {
+                    "error": f"Unknown tool: {tool_name}"
+                }, True
+                
+        except Exception as e:
+            return {
+                "error": f"Tool execution failed: {str(e)}"
+            }, True
 
-    def process_message(self, user_input: str) -> str:
+    async def _handle_tool_calls(
+        self, 
+        tool_calls: List[Dict]
+    ) -> List[Dict[str, Any]]:
+        """
+        Handle multiple tool calls and collect their results.
+        
+        Args:
+            tool_calls: List of tool calls from Claude's response
+            
+        Returns:
+            List[Dict]: List of tool results to be added to conversation history
+        """
+        tool_results = []
+        
+        for tool_call in tool_calls:
+            # Execute the tool
+            result, is_error = await self._execute_tool(
+                tool_call.function.name,
+                tool_call.function.arguments
+            )
+            
+            # Format the tool result
+            tool_results.append({
+                "role": "user",
+                "content": [{
+                    "type": "tool_result",
+                    "tool_use_id": tool_call.id,
+                    "content": str(result),
+                    "is_error": is_error
+                }]
+            })
+            
+        return tool_results
+    
+    async def process_message(self, user_input: str) -> str:
         """
         Process a single user message and return assistant's response
         """
         try:
             # Get response from Claude
             response = self.client.messages.create(
-                model="claude-3-5-sonnet-20241022",
+                model=self.MODEL,
                 max_tokens=1024,
                 system=self.system_prompt,  # Pass the prompt string directly
                 messages=[
@@ -50,8 +124,14 @@ class MedicalAssistantLLM:
                         "role": "user",
                         "content": user_input
                     }
-                ]
+                ],
+                tools=Tool.get_all_tools(),
+                tool_choice={"type": "auto"},
             )
+
+            if response.tool_calls:
+                tool_results = await self._handle_tool_calls(response.tool_calls)
+                self.conversation_history.extend(tool_results)
 
             # Update conversation history
             self.conversation_history.extend([
@@ -62,9 +142,9 @@ class MedicalAssistantLLM:
             return response.content[0].text
 
         except Exception as e:
-            print(f"Detailed error: {str(e)}")  # Added detailed error logging
+            print(f"Detailed error: {str(e)}")  
             return f"Error processing message: {str(e)}"
-
+    
     def clear_history(self):
         """Clear the conversation history"""
         self.conversation_history = []
@@ -84,32 +164,6 @@ def main():
     api_key = os.getenv('ANTHROPIC_API_KEY')
     if not api_key:
         raise ValueError("ANTHROPIC_API_KEY not found in environment variables")
-
-    try:
-        # Initialize the LLM component
-        medical_llm = MedicalAssistantLLM(
-            anthropic_api_key=api_key,
-            prompt_path="prompt.yaml"
-        )
-        
-        # First interaction - Symptoms
-        print("Sending first message...")
-        response = medical_llm.process_message(
-            "I have a severe headache and fever for 2 days"
-        )
-        print("Response 1:", response)
-        print("-" * 50)
-        
-        # Second interaction - Patient Info
-        print("Sending second message...")
-        response = medical_llm.process_message(
-            "I'm a 35 year old male in Paris"
-        )
-        print("Response 2:", response)
-        print("-" * 50)
-            
-    except Exception as e:
-        print(f"Error during conversation: {str(e)}")
 
  
 if __name__ == "__main__":

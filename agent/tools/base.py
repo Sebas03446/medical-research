@@ -46,13 +46,12 @@ class Tool:
         required = []
         
         for param_name, param in sig.parameters.items():
-            # Skip 'self' parameter for class methods
+            
             if param_name == 'self':
                 continue
                 
             param_type = type_hints.get(param_name, str)
             
-            # Get parameter description from docstring
             param_doc = ""
             if self.function.__doc__:
                 for line in self.function.__doc__.split('\n'):
@@ -72,7 +71,6 @@ class Tool:
                 "description": param_doc
             }
             
-            # Add to required list if no default value
             if param.default == inspect.Parameter.empty:
                 required.append(param_name)
 
