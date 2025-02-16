@@ -12,7 +12,7 @@ client = anthropic.Anthropic(api_key=API_KEY)
 
 # Streamlit UI
 st.set_page_config(page_title="Claude AI Chatbot", page_icon="🤖")
-st.title("🤖 Chat with Claude")
+st.title("🤖 Chat with HeyDoc")
 
 # Store chat history
 if "messages" not in st.session_state:
