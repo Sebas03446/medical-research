@@ -13,6 +13,33 @@ def get_doctolib_specialisations() -> list:
     specialisations = ['Médecin généraliste', 'Cabinet médical', 'Médecin morphologue et anti-âge', 'Cabinet pluridisciplinaire', 'Centre de santé', 'Maison de santé', 'Infectiologue', 'Pharmacie', 'Centre laser et esthétique', 'Interne en médecine', 'Ophtalmologue', "Établissement de Santé Privé d'Intérêt Collectif (ESPIC)", "Centre d'ophtalmologie", 'Cabinet médical et dentaire', 'Centre médical et dentaire', 'Allergologue', 'Pneumologue', 'Pédiatre', 'ORL', 'Dermatologue et vénérologue', 'Hôpital public', 'Spécialiste en médecine interne', 'Psychologue']
     
     return specialisations
+def standardize_doctor(doctor: dict) -> dict:
+    """
+    Standardizes a doctor's dictionary keys to English.
+
+    Changes:
+      - 'nom' becomes 'name'
+      - 'horaire_contact' becomes 'contact_info'
+      - 'tarif' becomes 'pricing'
+
+    Other keys remain unchanged.
+
+    Parameters:
+        doctor (dict): The original doctor dictionary with French keys.
+
+    Returns:
+        dict: A new dictionary with standardized English keys.
+    """
+    return {
+        "description": doctor.get("description", ""),
+        "expertise": doctor.get("expertise", ""),
+        "contact_info": doctor.get("horaire_contact", ""),
+        "image": doctor.get("image", ""),
+        "name": doctor.get("nom", ""),
+        "phones": doctor.get("phones", []),
+        "pricing": doctor.get("tarif", ""),
+        "url": doctor.get("url", "")
+    }
 
 def get_doctors(specialisation_name: str) -> list:
     """
@@ -36,6 +63,8 @@ def get_doctors(specialisation_name: str) -> list:
 
     for key, doctors in data.items():
         if key.strip() == normalized_spec:
-            return doctors
+            return [standardize_doctor(doctor) for doctor in doctors]
+
+    return []
 
     return []

@@ -14,29 +14,31 @@ system_prompt: |-
       Returns: List[Dict] containing symptom IDs and names
       Example response: [{"ID": 10, "Name": "Abdominal pain"}, ...]
 
-  - analyze_symptoms: Matches user symptoms with known medical conditions database
-      Inputs: 
-        - symptoms (str): User's described symptoms
-        - patient_info (dict): Additional patient information like age, gender
-      Returns: Dict containing matched conditions, urgency level, and recommended specialties
-
-   - get_specializations: Gets recommended medical specializations based on symptoms
+  - get_specialisations: Gets recommended medical specialisations based on symptoms
       Inputs:
         - symptom_ids (List[int]): List of symptom IDs
         - patient_info (dict): Must include 'age' and 'gender'
       Returns: List[Dict] containing:
-        - ID: Specialization ID
-        - Name: Specialization name
+        - ID: Specialisation ID
+        - Name: Specialisation name
         - Accuracy: Match accuracy percentage
         - Ranking: Priority ranking
-
-  - search_doctors: Uses Doctolib API to find available doctors nearby
+  - get_doctolib_specialisations: Retrieves list of medical specializations from Doctolib API
+      Inputs: None
+      Returns: List of medical specializations with doctolib standardized names
+  - get_doctors: Uses Doctolib API to find available doctors nearby
       Inputs:
         - specialty (str): Required medical specialty
-        - location (dict): User's location details
-        - timeframe (str, optional): Preferred appointment timeframe
-      Returns: List of available doctors with their details and appointment slots
-
+      Returns: List[Dict] containing:
+        - description: Doctor's description
+        - expertise: Doctor's expertise
+        - contact_info: Doctor's contact information
+        - image: Doctor's image URL
+        - name: Doctor's name
+        - phones: Doctor's contact phone numbers
+        - pricing: Doctor's pricing information
+        - url: Doctor's Doctolib URL
+        
   Rules:
   1. Always start by gathering detailed symptom information
   2. Clearly indicate if emergency care is needed
