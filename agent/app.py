@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 from datetime import datetime
 from dotenv import load_dotenv
+from backend.app.services.medical_api import get_symptoms
 
 
 class MedicalAssistantLLM:
@@ -109,4 +110,5 @@ def main():
 
  
 if __name__ == "__main__":
-    main()
+    #main()
+    print(get_symptoms())

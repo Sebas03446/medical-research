@@ -4,7 +4,7 @@ import hashlib
 import base64
 import json
 import os
-import app.config as settings
+import backend.app.config as settings
 
 
 def get_access_token(api_key: str, secret_key: str, response_format: str = "json") -> dict:
@@ -46,7 +46,7 @@ def get_symptoms() -> list:
     :raises FileNotFoundError: If the symptoms file is not found at the specified path.
     :raises json.JSONDecodeError: If the file content is not valid JSON.
     """
-    file_path = "app/services/symptoms.json"
+    file_path = "backend/app/services/symptoms.json"
     if not os.path.exists(file_path):
         raise FileNotFoundError(f"Symptoms file not found at path: {file_path}")
     
