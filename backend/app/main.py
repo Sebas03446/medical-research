@@ -32,5 +32,3 @@ if settings.CORS_ORIGINS:
     )
 
 app.include_router(hello_world.router, prefix=settings.API_V1_STR, tags=["hello_world"])
-
-

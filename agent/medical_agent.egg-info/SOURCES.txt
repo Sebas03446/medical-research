@@ -1,0 +1,6 @@
+setup.py
+medical_agent.egg-info/PKG-INFO
+medical_agent.egg-info/SOURCES.txt
+medical_agent.egg-info/dependency_links.txt
+medical_agent.egg-info/requires.txt
+medical_agent.egg-info/top_level.txt

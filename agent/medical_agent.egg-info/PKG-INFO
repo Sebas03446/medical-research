@@ -1,0 +1,8 @@
+Metadata-Version: 2.2
+Name: medical_agent
+Version: 0.1.0
+Requires-Dist: anthropic
+Requires-Dist: python-dotenv
+Requires-Dist: pyyaml
+Requires-Dist: medical_research_backend@ file:///Users/zeinab/Downloads/medical-research/backend
+Dynamic: requires-dist

@@ -4,13 +4,10 @@ import yaml
 import os 
 from dotenv import load_dotenv
 from backend.app.services.medical_api import get_symptoms, get_specialisations
-from dotenv import load_dotenv
-import os
 
-from services import MedicalService
-from tools import Tool
+from agent.services import MedicalService
+from agent.tools import Tool
 
-load_dotenv() 
 
 class MedicalAssistantLLM:
     def __init__(self, anthropic_api_key: str, prompt_path: str = "prompt.yaml"):

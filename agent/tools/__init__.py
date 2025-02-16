@@ -1,8 +1,3 @@
-#from tools.medical_tools import MedicalTools
-#from tools.base import Tool
+from .base import Tool
 
-
-#__all__ = [
-#    'Tool', 
-#    'MedicalTools',
-#]
+__all__ = ['Tool']

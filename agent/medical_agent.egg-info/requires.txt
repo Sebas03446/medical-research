@@ -1,0 +1,4 @@
+anthropic
+python-dotenv
+pyyaml
+medical_research_backend@ file:///Users/zeinab/Downloads/medical-research/backend
