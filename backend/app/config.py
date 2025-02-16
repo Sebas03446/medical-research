@@ -9,6 +9,9 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = "local"  
     CORS_ORIGINS: List[str] = ["http://localhost:8080"]  
 
+    API_KEY_MEDICAL_API: str
+    SECRET_KEY_MEDICAL_API: str
+    
     model_config = ConfigDict(env_file=".env") 
 
 settings = Settings()
