@@ -66,5 +66,3 @@ def get_doctors(specialisation_name: str) -> list:
             return [standardize_doctor(doctor) for doctor in doctors]
 
     return []
-
-    return []
