@@ -3,7 +3,6 @@ import anthropic
 import yaml
 import os 
 from dotenv import load_dotenv
-from backend.app.services.medical_api import get_symptoms, get_specialisations
 
 from agent.services import MedicalService
 from agent.tools import Tool
@@ -51,14 +50,29 @@ class MedicalAssistantLLM:
                 - result: Tool execution result or error message
                 - is_error: True if an error occurred, False otherwise
         """
+        """Execute a tool and return its result along with error status."""
         try:
             if tool_name == "get_symptoms":
                 result = await self.service.get_symptoms()
-                return result, False
+                return {"symptoms": result}, False
                 
             elif tool_name == "get_specializations":
-                result = await self.service.get_specializations(**tool_args)
-                return result, False
+                # Parse and validate arguments
+                symptom_ids = tool_args.get('symptom_ids', [])
+                age = tool_args.get('age')
+                gender = tool_args.get('gender')
+                
+                if not all([symptom_ids, age, gender]):
+                    return {
+                        "error": "Missing required arguments: symptom_ids, age, and gender are required"
+                    }, True
+                
+                result = await self.service.get_specializations(
+                    symptom_ids=symptom_ids,
+                    age=int(age),
+                    gender=str(gender).lower()
+                )
+                return {"specializations": result}, False
                 
             else:
                 return {
@@ -105,38 +119,145 @@ class MedicalAssistantLLM:
             
         return tool_results
     
+    # async def _handle_tool_response(self, response: Any, messages: List[Dict]) -> str:
+    #     """
+    #     Handle tool use response from Claude and get final response.
+    #     """
+    #     try:
+    #         if response.stop_reason == 'tool_use':
+    #             for content in response.content:
+    #                 if content.type == 'tool_use':
+    #                     # Execute the requested tool
+    #                     tool_result, is_error = await self._execute_tool(
+    #                         content.name,
+    #                         content.input
+    #                     )
+
+    #                     messages.extend([
+    #                         # {
+    #                         #     "role": "assistant",
+    #                         #     "content": response.content[0].text
+    #                         # },
+    #                         {
+    #                             "role": "assistant",
+    #                             "content": str(tool_result)
+    #                         }
+    #                     ])
+                        
+    #                     # Get final response from Claude with tool results
+    #                     final_response = self.client.messages.create(
+    #                         model=self.MODEL,
+    #                         max_tokens=1024,
+    #                         system=self.system_prompt,
+    #                         messages=messages,
+    #                         tools=Tool.get_all_tools(),
+    #                     )
+                        
+    #                     return final_response.content[0].text
+                        
+    #         return response.content[0].text
+            
+    #     except Exception as e:
+    #         print(f"Error handling tool response: {str(e)}")
+    #         raise
+    async def _chain_tool_calls(self, initial_response: Any, messages: List[Dict]) -> str:
+        """
+        Chain multiple tool calls and their responses together.
+        
+        Args:
+            initial_response: Initial response from Claude
+            messages: Current conversation messages
+        
+        Returns:
+            str: Final response after all tool calls are completed
+        """
+        try:
+            current_response = initial_response
+            
+            while current_response.stop_reason == 'tool_use':
+                for content in current_response.content:
+                    if content.type == 'tool_use':
+                        # Get the assistant's reasoning
+                        reasoning = next(
+                            (c.text for c in current_response.content if c.type == 'text'),
+                            "Processing your request..."
+                        )
+                        
+                        # Execute the tool
+                        tool_result, is_error = await self._execute_tool(
+                            content.name,
+                            content.input
+                        )      
+
+                        print(tool_result) 
+                        # Add to conversation
+                        messages.extend([
+                            {
+                                "role": "assistant",
+                                "content": reasoning
+                            },
+                            {
+                                "role": "assistant",
+                                "content": tool_result
+                            }
+                        ])
+                        
+                        # Get next response from Claude
+                        current_response = self.client.messages.create(
+                            model=self.MODEL,
+                            max_tokens=1024,
+                            system=self.system_prompt,
+                            messages=messages,
+                            tools=Tool.get_all_tools(),
+                        )
+                        
+                        # If this response doesn't require a tool, it's our final response
+                        if current_response.stop_reason != 'tool_use':
+                            return current_response.content[0].text
+                        
+                        # Otherwise, continue the loop for more tool calls
+            
+            # Return the final response text
+            return current_response.content[0].text
+            
+        except Exception as e:
+            print(f"Error in tool chain: {str(e)}")
+            raise
+
     async def process_message(self, user_input: str) -> str:
         """
         Process a single user message and return assistant's response
         """
         try:
+            messages = [
+                *self.conversation_history,
+                {
+                    "role": "user",
+                    "content": user_input
+                }
+            ]
             # Get response from Claude
-            response = self.client.messages.create(
+            initial_response = self.client.messages.create(
                 model=self.MODEL,
                 max_tokens=1024,
                 system=self.system_prompt,  # Pass the prompt string directly
-                messages=[
-                    *self.conversation_history,
-                    {
-                        "role": "user",
-                        "content": user_input
-                    }
-                ],
+                messages=messages,
                 tools=Tool.get_all_tools(),
                 tool_choice={"type": "auto"},
             )
+            if initial_response.stop_reason == 'tool_use':
 
-            if response.tool_calls:
-                tool_results = await self._handle_tool_calls(response.tool_calls)
-                self.conversation_history.extend(tool_results)
+                final_response = await self._chain_tool_calls(initial_response, messages)
+            else: 
+                final_response = initial_response.content[0].text
 
             # Update conversation history
             self.conversation_history.extend([
                 {"role": "user", "content": user_input},
-                {"role": "assistant", "content": response.content[0].text}
+                {"role": "assistant", "content": final_response}
             ])
 
-            return response.content[0].text
+            return final_response.content[0].text
 
         except Exception as e:
             print(f"Detailed error: {str(e)}")  
@@ -155,15 +276,32 @@ class MedicalAssistantLLM:
         self.system_prompt = self._load_system_prompt(prompt_path)
 
 
-def main():
+async def main():
     load_dotenv()
     
     api_key = os.getenv('ANTHROPIC_API_KEY')
     if not api_key:
         raise ValueError("ANTHROPIC_API_KEY not found in environment variables")
 
- 
+    assistant = MedicalAssistantLLM(
+        anthropic_api_key=api_key,
+        prompt_path="agent/prompt.yaml" 
+    )
+
+    try:
+        print("\nQuerying about symptoms...")
+        response = await assistant.process_message(
+            "I have fever, and stomachache."
+        )
+        print(f"{response}")
+        
+        for message in assistant.get_conversation_history():
+            print(f"{message['role']}: {message['content']}\n")
+          
+    except Exception as e:
+        print(f"Error during execution: {str(e)}")
+
+
 if __name__ == "__main__":
-    #main()
-    #print(get_symptoms())
-    print(get_specialisations([101],"male",1990))
+    import asyncio
+    asyncio.run(main())
